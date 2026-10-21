@@ -202,11 +202,11 @@ export class DerivWebSocketClient {
         close: Number(c.close),
       }))
       .filter(
-        (c) =>
-          Number.isFinite(c.epoch) &&
-          Number.isFinite(c.open) &&
-          Number.isFinite(c.close)
-      );
+  (c: Candle) =>
+    Number.isFinite(c.epoch) &&
+    Number.isFinite(c.open) &&
+    Number.isFinite(c.close)
+);
     this.emit('onCandles', mapped);
   }
 
