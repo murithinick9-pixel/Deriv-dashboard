@@ -6,8 +6,6 @@ import type {
 } from './types';
 import { extractFinalDigit } from '../statistics/digits';
 
-type MessageHandler = (msg: any) => void;
-
 export type DerivClientEvents = {
   onState: (state: ConnectionState) => void;
   onTick: (tick: Tick) => void;
@@ -30,8 +28,8 @@ export class DerivWebSocketClient {
   private lastSubscriptionIds = new Set<string>();
 
   constructor(private appId: string = '1089') {
-  this.appId = '1089'; // Temporarily forcing the test ID
-}
+    this.appId = appId || '1089';
+  }
 
   on<K extends keyof DerivClientEvents>(
     event: K,
@@ -49,80 +47,72 @@ export class DerivWebSocketClient {
   }
 
   connect() {
-  this.emit('onState', 'connecting');
-  
-  try {
-    // Using the primary endpoint
-    this.ws = new WebSocket(
-      `wss://ws.derivws.com/websockets/v3?app_id=${this.appId}`
-    );
+    this.emit('onState', 'connecting');
+    
+    try {
+      this.ws = new WebSocket(
+        `wss://ws.derivws.com/websockets/v3?app_id=${this.appId}`
+      );
 
-    // Add a 10-second timeout to prevent hanging
-    const connectionTimeout = setTimeout(() => {
-      if (this.ws?.readyState !== WebSocket.OPEN) {
-        this.emit('onError', 'Connection timed out. Please check your internet or try Wi-Fi.');
-        if (this.ws) this.ws.close();
-      }
-    }, 10000);
+      this.ws.onopen = () => {
+        this.reconnectAttempt = 0;
+        this.emit('onState', 'connected');
+        this.startPing();
+        this.requestActiveSymbols();
+        if (this.currentSymbol) {
+          this.subscribeTicks(this.currentSymbol);
+          this.requestCandles(this.currentSymbol);
+        }
+      };
 
-    this.ws.onopen = () => {
-      clearTimeout(connectionTimeout);
-      this.reconnectAttempt = 0;
-      this.emit('onState', 'connected');
-      this.startPing();
-      this.requestActiveSymbols();
-      if (this.currentSymbol) {
-        this.subscribeTicks(this.currentSymbol);
-        this.requestCandles(this.currentSymbol);
-      }
-    };
+      this.ws.onmessage = (event) => {
+        let msg: any;
+        try {
+          msg = JSON.parse(event.data);
+        } catch {
+          this.emit('onError', 'Malformed message received');
+          return;
+        }
 
-    // ... (keep the onmessage, onerror, and onclose parts exactly as they are) ...
+        if (msg.error) {
+          this.emit('onError', msg.error.message ?? 'API error');
+          return;
+        }
 
-    this.ws.onmessage = (event) => {
-      let msg: any;
-      try {
-        msg = JSON.parse(event.data);
-      } catch {
-        this.emit('onError', 'Malformed message received');
-        return;
-      }
+        switch (msg.msg_type) {
+          case 'active_symbols':
+            this.handleActiveSymbols(msg.active_symbols);
+            break;
+          case 'tick':
+            this.handleTick(msg);
+            break;
+          case 'candles':
+            this.handleCandles(msg);
+            break;
+          case 'pong':
+            this.handlePong();
+            break;
+          default:
+            break;
+        }
+      };
 
-      if (msg.error) {
-        this.emit('onError', msg.error.message ?? 'API error');
-        return;
-      }
+      this.ws.onerror = () => {
+        this.emit('onError', 'WebSocket error. Checking network...');
+      };
 
-      switch (msg.msg_type) {
-        case 'active_symbols':
-          this.handleActiveSymbols(msg.active_symbols);
-          break;
-        case 'tick':
-          this.handleTick(msg);
-          break;
-        case 'candles':
-          this.handleCandles(msg);
-          break;
-        case 'pong':
-          this.handlePong();
-          break;
-        default:
-          break;
-      }
-    };
-
-    this.ws.onerror = () => {
-      this.emit('onError', 'WebSocket error');
-    };
-
-    this.ws.onclose = () => {
-      this.stopPing();
-      if (this.reconnectAttempt < this.maxReconnects) {
-        this.scheduleReconnect();
-      } else {
-        this.emit('onState', 'disconnected');
-      }
-    };
+      this.ws.onclose = () => {
+        this.stopPing();
+        if (this.reconnectAttempt < this.maxReconnects) {
+          this.scheduleReconnect();
+        } else {
+          this.emit('onState', 'disconnected');
+        }
+      };
+    } catch (err) {
+      this.emit('onError', 'Failed to initialize connection.');
+      this.emit('onState', 'disconnected');
+    }
   }
 
   private scheduleReconnect() {
@@ -146,7 +136,8 @@ export class DerivWebSocketClient {
   }
 
   private handleActiveSymbols(symbols: any[]) {
-    const mapped: ActiveSymbol[] = symbols.map((s) => ({
+    if (!Array.isArray(symbols)) return;
+    const mapped: ActiveSymbol[] = symbols.map((s: any) => ({
       symbol: s.symbol,
       display_name: s.display_name,
       market: s.market,
@@ -218,11 +209,11 @@ export class DerivWebSocketClient {
         close: Number(c.close),
       }))
       .filter(
-  (c: Candle) =>
-    Number.isFinite(c.epoch) &&
-    Number.isFinite(c.open) &&
-    Number.isFinite(c.close)
-);
+        (c: Candle) =>
+          Number.isFinite(c.epoch) &&
+          Number.isFinite(c.open) &&
+          Number.isFinite(c.close)
+      );
     this.emit('onCandles', mapped);
   }
 
@@ -267,4 +258,4 @@ export class DerivWebSocketClient {
     }
     this.emit('onState', 'disconnected');
   }
-      }
+}
