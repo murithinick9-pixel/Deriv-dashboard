@@ -242,7 +242,7 @@ function CandleTable({ candles }: { candles: any[] }) {
           </tr>
         </thead>
         <tbody>
-          {candles.slice(-20).map((c) => (
+          {candles.slice(-20).map((c: any) => (
             <tr key={c.epoch} className="border-t border-slate-800/60">
               <td className="py-1 text-slate-400">
                 {new Date(c.epoch * 1000).toLocaleTimeString()}
