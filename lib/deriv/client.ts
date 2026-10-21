@@ -51,8 +51,8 @@ export class DerivWebSocketClient {
   connect() {
     this.emit('onState', 'connecting');
     this.ws = new WebSocket(
-      `wss://ws.derivws.com/websockets/v3?app_id=${this.appId}`
-    );
+  `wss://ws.binaryws.com/websockets/v3?app_id=${this.appId}`
+);
 
     this.ws.onopen = () => {
       this.reconnectAttempt = 0;
