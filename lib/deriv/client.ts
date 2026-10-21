@@ -30,7 +30,7 @@ export class DerivWebSocketClient {
   private lastSubscriptionIds = new Set<string>();
 
   constructor(private appId: string = '1089') {
-  this.appId = appId || '1089';
+  this.appId = '1089'; // Temporarily forcing the test ID
 }
 
   on<K extends keyof DerivClientEvents>(
