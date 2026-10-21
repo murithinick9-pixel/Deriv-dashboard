@@ -29,7 +29,9 @@ export class DerivWebSocketClient {
   private symbolPipSizes = new Map<string, number>();
   private lastSubscriptionIds = new Set<string>();
 
-  constructor(private appId: string = '1089') {}
+  constructor(private appId: string = '1089') {
+  this.appId = appId || '1089';
+}
 
   on<K extends keyof DerivClientEvents>(
     event: K,
