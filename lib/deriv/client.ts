@@ -49,12 +49,24 @@ export class DerivWebSocketClient {
   }
 
   connect() {
-    this.emit('onState', 'connecting');
+  this.emit('onState', 'connecting');
+  
+  try {
+    // Using the primary endpoint
     this.ws = new WebSocket(
-  `wss://ws.binaryws.com/websockets/v3?app_id=${this.appId}`
-);
+      `wss://ws.derivws.com/websockets/v3?app_id=${this.appId}`
+    );
+
+    // Add a 10-second timeout to prevent hanging
+    const connectionTimeout = setTimeout(() => {
+      if (this.ws?.readyState !== WebSocket.OPEN) {
+        this.emit('onError', 'Connection timed out. Please check your internet or try Wi-Fi.');
+        if (this.ws) this.ws.close();
+      }
+    }, 10000);
 
     this.ws.onopen = () => {
+      clearTimeout(connectionTimeout);
       this.reconnectAttempt = 0;
       this.emit('onState', 'connected');
       this.startPing();
@@ -64,6 +76,8 @@ export class DerivWebSocketClient {
         this.requestCandles(this.currentSymbol);
       }
     };
+
+    // ... (keep the onmessage, onerror, and onclose parts exactly as they are) ...
 
     this.ws.onmessage = (event) => {
       let msg: any;
